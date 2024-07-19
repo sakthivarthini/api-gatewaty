@@ -1,0 +1,58 @@
+pipeline:
+  agent:
+    any
+  stages:
+    - stage: Build
+      steps:
+        - script:
+            script: |
+              def deploymentYamlContent = """
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: poojaimages
+              spec:
+                replicas: 1
+                selector:
+                  matchLabels:
+                    app: poojaimages
+                template:
+                  metadata:
+                    labels:
+                      app: poojaimages
+                  spec:
+                    containers:
+                      - name: search-services
+                        image: \${NEXUS_DOCKER_REPO}/Poojaimages:1.0.2
+                        ports:
+                          - containerPort: 8086
+              """
+              writeFile file: 'k0s-deployment.yaml', text: deploymentYamlContent
+
+        - script:
+            script: |
+              def serviceYamlContent = """
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: poojaimage-service
+                namespace: default
+              spec:
+                selector:
+                  app: poojaimages
+                ports:
+                  - protocol: "TCP"
+                    port: 9096
+                    targetPort: 8086
+              """
+              writeFile file: 'service-deployment.yaml', text: serviceYamlContent
+
+    - stage: Post-Build
+      post:
+        success:
+          - archiveArtifacts:
+              artifacts: 'k0s-deployment.yaml'
+              onlyIfSuccessful: true
+          - archiveArtifacts:
+              artifacts: 'service-deployment.yaml'
+              allowEmptyArchive: true
